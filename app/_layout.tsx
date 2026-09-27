@@ -1,56 +1,89 @@
-import { useFonts } from 'expo-font';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
+import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { Text, View } from 'react-native';
+import { PaperProvider } from 'react-native-paper';
 import 'react-native-reanimated';
 
-import { useColorScheme } from '@/components/useColorScheme';
+import { S } from '@/constants/strings';
+import { paperTheme } from '@/constants/theme';
+import { db, seedIfEmpty } from '@/db';
+import migrations from '@/drizzle/migrations';
+import { checkOverdue } from '@/services/debts';
 
-export {
-  // Catch any errors thrown by the Layout component.
-  ErrorBoundary,
-} from 'expo-router';
+export { ErrorBoundary } from 'expo-router';
 
 export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
   initialRouteName: '(tabs)',
 };
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const [loaded, error] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-  });
-
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
-  useEffect(() => {
-    if (error) throw error;
-  }, [error]);
+  const { success, error } = useMigrations(db, migrations);
+  const [seeded, setSeeded] = useState(false);
 
   useEffect(() => {
-    if (loaded) {
+    if (success) {
+      seedIfEmpty()
+        .then(() => setSeeded(true))
+        .then(() => checkOverdue().catch(() => {}));
+    }
+  }, [success]);
+
+  useEffect(() => {
+    if (seeded || error) {
       SplashScreen.hideAsync();
     }
-  }, [loaded]);
+  }, [seeded, error]);
 
-  if (!loaded) {
-    return null;
+  if (error) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+        <Text>Error preparando la base de datos: {error.message}</Text>
+      </View>
+    );
   }
 
-  return <RootLayoutNav />;
-}
-
-function RootLayoutNav() {
-  const colorScheme = useColorScheme();
+  if (!seeded) return null;
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <PaperProvider theme={paperTheme}>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+        <Stack.Screen
+          name="movimiento/nuevo"
+          options={{ presentation: 'modal', title: S.movimientos.nuevo }}
+        />
+        <Stack.Screen
+          name="movimiento/[id]"
+          options={{ presentation: 'modal', title: 'Editar movimiento' }}
+        />
+        <Stack.Screen name="fijos" options={{ title: 'Gastos fijos' }} />
+        <Stack.Screen name="mercado/index" options={{ title: 'Lista de mercado' }} />
+        <Stack.Screen name="mercado/[id]" options={{ title: 'Mercado' }} />
+        <Stack.Screen
+          name="fijo/nuevo"
+          options={{ presentation: 'modal', title: 'Nuevo gasto fijo' }}
+        />
+        <Stack.Screen
+          name="fijo/[id]"
+          options={{ presentation: 'modal', title: 'Editar gasto fijo' }}
+        />
+        <Stack.Screen
+          name="deuda/nueva"
+          options={{ presentation: 'modal', title: 'Nueva deuda' }}
+        />
+        <Stack.Screen name="deuda/[id]" options={{ title: 'Deuda' }} />
+        <Stack.Screen
+          name="deuda/editar/[id]"
+          options={{ presentation: 'modal', title: 'Editar deuda' }}
+        />
+        <Stack.Screen name="notas" options={{ title: S.mas.notas }} />
+        <Stack.Screen name="logros" options={{ title: S.mas.logros }} />
+        <Stack.Screen name="ajustes" options={{ title: S.mas.ajustes }} />
       </Stack>
-    </ThemeProvider>
+    </PaperProvider>
   );
 }

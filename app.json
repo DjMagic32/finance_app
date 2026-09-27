@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "finapp_scaffold",
-    "slug": "finapp_scaffold",
+    "name": "Mis Finanzas",
+    "slug": "mis-finanzas",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "finappscaffold",
+    "scheme": "misfinanzas",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true
@@ -17,7 +17,8 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.djmagic32.misfinanzas"
     },
     "web": {
       "bundler": "metro",
@@ -33,7 +34,10 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
-      ]
+      ],
+      "expo-sqlite",
+      "expo-localization",
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true
