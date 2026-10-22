@@ -10,6 +10,8 @@ import { S } from '@/constants/strings';
 import { AppColors, Semaforo } from '@/constants/theme';
 import { db, todayISO } from '@/db';
 import { transactions } from '@/db/schema';
+import { computeBudget, type BudgetStatus } from '@/services/budget';
+import { computeInsights, type Insight } from '@/services/insights';
 import { getLatestRates, refreshRates, type RateInfo, type Rates } from '@/services/rates';
 import { computeHealthScore, getGamState, type HealthScore } from '@/services/score';
 import { setupNotifications } from '@/services/notifications';
@@ -24,6 +26,15 @@ function fmt(n: number, decimals = 2) {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   });
+}
+
+function BudgetPill({ label, value }: { label: string; value: number }) {
+  return (
+    <View style={styles.pill}>
+      <Text style={styles.pillLabel}>{label}</Text>
+      <Text style={styles.pillValue}>${fmt(value, 0)}</Text>
+    </View>
+  );
 }
 
 function RateRow({ label, info }: { label: string; info?: RateInfo }) {
@@ -48,6 +59,8 @@ export default function InicioScreen() {
   const [rates, setRates] = useState<Rates>({});
   const [refreshing, setRefreshing] = useState(false);
   const [score, setScore] = useState<HealthScore | null>(null);
+  const [budget, setBudget] = useState<BudgetStatus | null>(null);
+  const [insights, setInsights] = useState<Insight[]>([]);
   const [streak, setStreak] = useState(0);
   const [welcome, setWelcome] = useState(false);
 
@@ -84,6 +97,8 @@ export default function InicioScreen() {
 
   useEffect(() => {
     computeHealthScore().then(setScore);
+    computeBudget().then(setBudget);
+    computeInsights().then(setInsights);
     getGamState().then((g) => setStreak(g.streakDays));
   }, [monthTx]);
 
@@ -174,6 +189,51 @@ export default function InicioScreen() {
         </Card>
       )}
 
+      {budget && (
+        <Card style={{ borderLeftWidth: 6, borderLeftColor: budget.color }}>
+          <Card.Content style={{ gap: 6 }}>
+            <View style={styles.rateRow}>
+              <Text variant="titleMedium">Cuánto puedes gastar</Text>
+              <Text style={{ fontSize: 12, color: '#888' }}>
+                meta ahorro {budget.savingsPct}%
+              </Text>
+            </View>
+            <Text variant="titleLarge" style={{ color: budget.color, fontWeight: 'bold' }}>
+              {budget.headline}
+            </Text>
+            <Text style={{ color: '#555' }}>{budget.detail}</Text>
+            <View style={styles.budgetRow}>
+              <BudgetPill label="Ingresos" value={budget.monthIncome} />
+              <BudgetPill label="Gastos" value={budget.monthSpent} />
+              <BudgetPill label="Fijos" value={budget.fixedUpcoming} />
+              <BudgetPill label="Deudas" value={budget.debtsUpcoming} />
+            </View>
+          </Card.Content>
+        </Card>
+      )}
+
+      {insights.length > 0 && (
+        <Card>
+          <Card.Content style={{ gap: 12 }}>
+            <View style={styles.rateRow}>
+              <Text variant="titleMedium">Consejos para ti</Text>
+              <Text style={{ fontSize: 12, color: '#888' }}>{insights.length} señales</Text>
+            </View>
+            {insights.slice(0, 3).map((it) => (
+              <View key={it.key} style={styles.insightRow}>
+                <View style={[styles.insightIcon, { backgroundColor: `${it.color}22` }]}>
+                  <MaterialCommunityIcons name={it.icon as any} size={22} color={it.color} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontWeight: 'bold' }}>{it.title}</Text>
+                  <Text style={{ color: '#666', fontSize: 13 }}>{it.detail}</Text>
+                </View>
+              </View>
+            ))}
+          </Card.Content>
+        </Card>
+      )}
+
       <Card>
         <Card.Content>
           <Text variant="titleMedium">{S.inicio.saldoMes}</Text>
@@ -223,6 +283,35 @@ const styles = StyleSheet.create({
     height: 72,
     borderRadius: 36,
     borderWidth: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  budgetRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  pill: {
+    flex: 1,
+    minWidth: 70,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+  },
+  pillLabel: { fontSize: 11, color: '#666' },
+  pillValue: { fontSize: 15, fontWeight: 'bold', color: '#333' },
+  insightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  insightIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },

@@ -2,9 +2,11 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { desc, eq } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { useRouter } from 'expo-router';
-import { SectionList, StyleSheet, View } from 'react-native';
-import { Button, FAB, List, Text } from 'react-native-paper';
+import { useState } from 'react';
+import { ScrollView, SectionList, StyleSheet, View } from 'react-native';
+import { Button, Chip, FAB, List, Text } from 'react-native-paper';
 
+import QuickAddSheet from '@/components/QuickAddSheet';
 import { S } from '@/constants/strings';
 import { AppColors, Semaforo } from '@/constants/theme';
 import { db, todayISO } from '@/db';
@@ -26,6 +28,8 @@ function dateLabel(date: string) {
 
 export default function MovimientosScreen() {
   const router = useRouter();
+  const [filter, setFilter] = useState<'todos' | 'sin_categoria'>('todos');
+  const [quickOpen, setQuickOpen] = useState(false);
   const { data: rows } = useLiveQuery(
     db
       .select({ tx: transactions, cat: categories })
@@ -34,9 +38,14 @@ export default function MovimientosScreen() {
       .orderBy(desc(transactions.date), desc(transactions.id)),
   );
 
+  const sinCategoriaCount = (rows ?? []).filter((r) => r.tx.categoryId == null).length;
+  const filteredRows = (rows ?? []).filter((r) =>
+    filter === 'sin_categoria' ? r.tx.categoryId == null : true,
+  );
+
   const sections = (() => {
-    const map = new Map<string, typeof rows>();
-    for (const r of rows ?? []) {
+    const map = new Map<string, typeof filteredRows>();
+    for (const r of filteredRows) {
       const key = r.tx.date;
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(r);
@@ -52,10 +61,32 @@ export default function MovimientosScreen() {
         style={{ alignSelf: 'flex-end', marginTop: 4 }}>
         Gastos fijos
       </Button>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filterRow}>
+        <Chip
+          selected={filter === 'todos'}
+          onPress={() => setFilter('todos')}
+          style={styles.filterChip}>
+          Todos ({rows?.length ?? 0})
+        </Chip>
+        <Chip
+          selected={filter === 'sin_categoria'}
+          onPress={() => setFilter('sin_categoria')}
+          style={styles.filterChip}
+          icon={sinCategoriaCount > 0 ? 'alert-circle-outline' : undefined}>
+          Sin categorizar ({sinCategoriaCount})
+        </Chip>
+      </ScrollView>
       {sections.length === 0 ? (
         <View style={styles.empty}>
           <MaterialCommunityIcons name="notebook-outline" size={64} color="#bbb" />
-          <Text style={styles.emptyText}>{S.movimientos.vacio}</Text>
+          <Text style={styles.emptyText}>
+            {filter === 'sin_categoria'
+              ? 'Todos tus movimientos tienen categoría. ¡Buen trabajo!'
+              : S.movimientos.vacio}
+          </Text>
         </View>
       ) : (
         <SectionList
@@ -83,7 +114,7 @@ export default function MovimientosScreen() {
               <List.Item
                 onPress={() => router.push(`/movimiento/${r.tx.id}`)}
                 title={r.cat?.name ?? 'Sin categoría'}
-                description={r.tx.note || secondary}
+                description={r.tx.note || r.tx.bankDescription || secondary}
                 left={() => (
                   <MaterialCommunityIcons
                     name={(r.cat?.icon as any) ?? 'help-circle'}
@@ -109,7 +140,16 @@ export default function MovimientosScreen() {
         style={styles.fab}
         color="white"
         onPress={() => router.push('/movimiento/nuevo')}
+        onLongPress={() => setQuickOpen(true)}
       />
+      <FAB
+        icon="flash"
+        small
+        style={styles.fabQuick}
+        color="white"
+        onPress={() => setQuickOpen(true)}
+      />
+      <QuickAddSheet visible={quickOpen} onClose={() => setQuickOpen(false)} />
     </View>
   );
 }
@@ -117,11 +157,19 @@ export default function MovimientosScreen() {
 const styles = StyleSheet.create({
   empty: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16, padding: 32 },
   emptyText: { textAlign: 'center', color: '#666', fontSize: 16 },
+  filterRow: { paddingHorizontal: 12, paddingBottom: 8, gap: 8, flexDirection: 'row' },
+  filterChip: { marginRight: 4 },
   header: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4, color: '#555' },
   fab: {
     position: 'absolute',
     right: 16,
     bottom: 16,
     backgroundColor: AppColors.primary,
+  },
+  fabQuick: {
+    position: 'absolute',
+    right: 22,
+    bottom: 88,
+    backgroundColor: '#FF9800',
   },
 });

@@ -250,7 +250,19 @@ export default function MovimientoForm({
             mode="outlined"
             error={!dateOk}
           />
-          <TextInput label={S.movimientos.nota} value={note} onChangeText={setNote} mode="outlined" />
+          {existing?.bankDescription ? (
+            <View style={styles.bankBox}>
+              <Text style={styles.bankLabel}>Descripción del banco</Text>
+              <Text style={styles.bankText}>{existing.bankDescription}</Text>
+            </View>
+          ) : null}
+          <TextInput
+            label={S.movimientos.nota}
+            value={note}
+            onChangeText={setNote}
+            mode="outlined"
+            placeholder={existing?.bankDescription ? 'Tu nota (opcional)' : undefined}
+          />
           {equivalent && (
             <Text style={{ color: '#666' }}>
               {type === 'gasto' ? 'Gasto' : 'Ingreso'} de{' '}
@@ -287,4 +299,12 @@ const styles = StyleSheet.create({
     minHeight: 76,
   },
   catLabel: { fontSize: 11, textAlign: 'center' },
+  bankBox: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: 8,
+    padding: 12,
+    gap: 4,
+  },
+  bankLabel: { fontSize: 12, color: '#666', fontWeight: '600' },
+  bankText: { fontSize: 14, color: '#333' },
 });

@@ -37,10 +37,18 @@
       ],
       "expo-sqlite",
       "expo-localization",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "c58dc365-76b5-4280-b508-21bd493a7d78"
+      }
+    },
+    "owner": "djmagic32"
   }
 }

@@ -83,6 +83,25 @@ export default function RootLayout() {
         <Stack.Screen name="notas" options={{ title: S.mas.notas }} />
         <Stack.Screen name="logros" options={{ title: S.mas.logros }} />
         <Stack.Screen name="ajustes" options={{ title: S.mas.ajustes }} />
+        <Stack.Screen name="proyectos" options={{ title: 'Proyectos' }} />
+        <Stack.Screen
+          name="proyecto/nuevo"
+          options={{ presentation: 'modal', title: 'Nuevo tablero' }}
+        />
+        <Stack.Screen name="proyecto/[id]" options={{ title: '' }} />
+        <Stack.Screen
+          name="proyecto/editar/[id]"
+          options={{ presentation: 'modal', title: 'Editar tablero' }}
+        />
+        <Stack.Screen name="proyecto/tarjeta/[id]" options={{ title: '' }} />
+        <Stack.Screen
+          name="proyecto/tarjeta/nueva"
+          options={{ presentation: 'modal', title: 'Nueva tarjeta' }}
+        />
+        <Stack.Screen
+          name="proyecto/tarjeta/editar/[id]"
+          options={{ presentation: 'modal', title: 'Editar tarjeta' }}
+        />
       </Stack>
     </PaperProvider>
   );

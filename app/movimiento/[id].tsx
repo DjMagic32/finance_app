@@ -1,7 +1,9 @@
 import { eq } from 'drizzle-orm';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { View } from 'react-native';
 
+import MovimientoAllocationsBar from '@/components/MovimientoAllocationsBar';
 import MovimientoForm from '@/components/MovimientoForm';
 import { db } from '@/db';
 import { transactions, type Transaction } from '@/db/schema';
@@ -20,5 +22,13 @@ export default function EditarMovimiento() {
   }, [id]);
 
   if (!tx) return null;
-  return <MovimientoForm existing={tx} onDone={() => router.back()} />;
+
+  return (
+    <View style={{ flex: 1 }}>
+      {tx.type === 'gasto' && <MovimientoAllocationsBar transaction={tx} />}
+      <View style={{ flex: 1 }}>
+        <MovimientoForm existing={tx} onDone={() => router.back()} />
+      </View>
+    </View>
+  );
 }
