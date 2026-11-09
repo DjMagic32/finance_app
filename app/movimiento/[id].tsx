@@ -5,6 +5,7 @@ import { View } from 'react-native';
 
 import MovimientoAllocationsBar from '@/components/MovimientoAllocationsBar';
 import MovimientoForm from '@/components/MovimientoForm';
+import MovimientoDebtLink from '@/components/MovimientoDebtLink';
 import { db } from '@/db';
 import { transactions, type Transaction } from '@/db/schema';
 
@@ -26,6 +27,7 @@ export default function EditarMovimiento() {
   return (
     <View style={{ flex: 1 }}>
       {tx.type === 'gasto' && <MovimientoAllocationsBar transaction={tx} />}
+      {tx.type === 'gasto' && <MovimientoDebtLink transaction={tx} />}
       <View style={{ flex: 1 }}>
         <MovimientoForm existing={tx} onDone={() => router.back()} />
       </View>

@@ -10,6 +10,12 @@ export default function MasScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: AppColors.fondo }}>
       <List.Item
+        title="Trabajo y pagos"
+        description="Empresas, empleados y semanas pendientes"
+        left={(p) => <List.Icon {...p} icon="briefcase-outline" />}
+        onPress={() => router.push('/trabajo' as never)}
+      />
+      <List.Item
         title="Proyectos"
         description="Tableros kanban para metas grandes (inversor, cocina, viaje...)"
         left={(p) => <List.Icon {...p} icon="view-dashboard" />}

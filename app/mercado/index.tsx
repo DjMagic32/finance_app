@@ -1,3 +1,4 @@
+import DictationInput from '@/components/DictationInput';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { desc, eq } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
@@ -90,7 +91,7 @@ export default function MercadoScreen() {
         <Dialog visible={visible} onDismiss={() => setVisible(false)}>
           <Dialog.Title>Nueva lista</Dialog.Title>
           <Dialog.Content>
-            <TextInput
+            <DictationInput
               label="Nombre (opcional)"
               value={name}
               onChangeText={setName}

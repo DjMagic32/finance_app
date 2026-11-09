@@ -48,6 +48,55 @@ export const debts = sqliteTable('debts', {
   createdAt: text('created_at').notNull(),
 });
 
+export const workCompanies = sqliteTable('work_companies', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+});
+
+export const workEmployees = sqliteTable('work_employees', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+});
+
+export const workWeeks = sqliteTable('work_weeks', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  companyId: integer('company_id').notNull().references(() => workCompanies.id),
+  startDate: text('start_date').notNull(),
+  endDate: text('end_date').notNull(),
+  currency: text('currency', { enum: ['VES', 'USD', 'USDT'] }).notNull(),
+  expectedCents: integer('expected_cents').notNull(),
+});
+
+export const workReceipts = sqliteTable('work_receipts', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  weekId: integer('week_id').notNull().references(() => workWeeks.id),
+  transactionId: integer('transaction_id').references(() => transactions.id),
+  date: text('date').notNull(),
+  currency: text('currency', { enum: ['VES', 'USD', 'USDT'] }).notNull(),
+  amountCents: integer('amount_cents').notNull(),
+  weekCreditCents: integer('week_credit_cents').notNull(),
+  personalCents: integer('personal_cents').notNull(),
+  employeeId: integer('employee_id').references(() => workEmployees.id),
+  employeeCents: integer('employee_cents').notNull(),
+});
+
+export const workDisbursements = sqliteTable('work_disbursements', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  receiptId: integer('receipt_id').notNull().references(() => workReceipts.id),
+  transactionId: integer('transaction_id').references(() => transactions.id),
+  date: text('date').notNull(),
+  amountCents: integer('amount_cents').notNull(),
+});
+
+export const workConversions = sqliteTable('work_conversions', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  transactionId: integer('transaction_id').references(() => transactions.id),
+  date: text('date').notNull(),
+  vesCents: integer('ves_cents').notNull(),
+  usdtMicros: integer('usdt_micros').notNull(),
+  feeMicros: integer('fee_micros').notNull(),
+});
+
 export const debtPayments = sqliteTable('debt_payments', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   debtId: integer('debt_id').notNull().references(() => debts.id),
@@ -56,6 +105,15 @@ export const debtPayments = sqliteTable('debt_payments', {
   paidAt: text('paid_at'),
   notificationIds: text('notification_ids').notNull().default('[]'),
 });
+
+export const debtTransactionAllocations = sqliteTable('debt_transaction_allocations', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  transactionId: integer('transaction_id').notNull().references(() => transactions.id),
+  paymentId: integer('payment_id').notNull().references(() => debtPayments.id),
+  amountCents: integer('amount_cents').notNull(),
+  debtAmountCents: integer('debt_amount_cents').notNull(),
+  createdAt: text('created_at').notNull(),
+}, (t) => [uniqueIndex('idx_debt_tx_payment').on(t.transactionId, t.paymentId)]);
 
 export const exchangeRates = sqliteTable('exchange_rates', {
   id: integer('id').primaryKey({ autoIncrement: true }),

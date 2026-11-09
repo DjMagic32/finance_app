@@ -1,3 +1,4 @@
+import DictationInput from '@/components/DictationInput';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { eq } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
@@ -6,10 +7,11 @@ import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { SegmentedButtons, Text, TextInput } from 'react-native-paper';
 
 import StepForm from '@/components/StepForm';
+import DateField from '@/components/DateField';
 import { S } from '@/constants/strings';
 import { AppColors, Semaforo } from '@/constants/theme';
 import { db, nowISO, todayISO } from '@/db';
-import { categories, transactions, type Transaction } from '@/db/schema';
+import { categories, transactions, workReceipts, workDisbursements, workConversions, debtTransactionAllocations, type Transaction } from '@/db/schema';
 import { getLatestRates } from '@/services/rates';
 import { BADGE_DEFS, evaluateExpenseRisk, registerActivity } from '@/services/score';
 
@@ -79,6 +81,11 @@ export default function MovimientoForm({
   const save = async () => {
     if (!effectiveRate) return;
     setSaving(true);
+    if (existing && (type !== existing.type || currency !== existing.currency || amount !== existing.amount) && hasWorkLinks(existing.id)) {
+      setSaving(false);
+      Alert.alert('Movimiento vinculado', 'No se puede cambiar el tipo, monto o moneda de un movimiento vinculado a una deuda, pago o conversión.');
+      return;
+    }
     const amountUsd = currency === 'USD' ? amount : amount / effectiveRate;
     const amountVes = currency === 'VES' ? amount : amount * effectiveRate;
 
@@ -127,6 +134,10 @@ export default function MovimientoForm({
 
   const remove = () => {
     if (!existing) return;
+    if (hasWorkLinks(existing.id)) {
+      Alert.alert('Movimiento vinculado', 'Desvincula la deuda o el pago antes de eliminar este movimiento.');
+      return;
+    }
     Alert.alert('Eliminar movimiento', '¿Seguro que lo borramos?', [
       { text: S.comun.cancelar, style: 'cancel' },
       {
@@ -243,20 +254,14 @@ export default function MovimientoForm({
 
       {step === 3 && (
         <View style={{ gap: 14 }}>
-          <TextInput
-            label={`${S.movimientos.fecha} (AAAA-MM-DD)`}
-            value={date}
-            onChangeText={setDate}
-            mode="outlined"
-            error={!dateOk}
-          />
+          <DateField label={S.movimientos.fecha} value={date} onChange={setDate} error={!dateOk} />
           {existing?.bankDescription ? (
             <View style={styles.bankBox}>
               <Text style={styles.bankLabel}>Descripción del banco</Text>
               <Text style={styles.bankText}>{existing.bankDescription}</Text>
             </View>
           ) : null}
-          <TextInput
+          <DictationInput
             label={S.movimientos.nota}
             value={note}
             onChangeText={setNote}
@@ -273,6 +278,13 @@ export default function MovimientoForm({
       )}
     </StepForm>
   );
+}
+
+function hasWorkLinks(id: number): boolean {
+  return !!(db.select().from(workReceipts).where(eq(workReceipts.transactionId, id)).get()
+    || db.select().from(workDisbursements).where(eq(workDisbursements.transactionId, id)).get()
+    || db.select().from(workConversions).where(eq(workConversions.transactionId, id)).get()
+    || db.select().from(debtTransactionAllocations).where(eq(debtTransactionAllocations.transactionId, id)).get());
 }
 
 const styles = StyleSheet.create({

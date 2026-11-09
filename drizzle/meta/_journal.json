@@ -43,6 +43,34 @@
       "when": 1790872876330,
       "tag": "0005_proyectos",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1790872876331,
+      "tag": "0006_work",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1790872876332,
+      "tag": "0007_work_payments",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1790872876333,
+      "tag": "0008_debt_transactions",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1790872876334,
+      "tag": "0009_debt_currencies",
+      "breakpoints": true
     }
   ]
 }

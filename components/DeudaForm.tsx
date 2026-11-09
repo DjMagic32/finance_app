@@ -1,8 +1,10 @@
+import DictationInput from '@/components/DictationInput';
 import { useEffect, useState } from 'react';
 import { Alert, View } from 'react-native';
 import { SegmentedButtons, Text, TextInput } from 'react-native-paper';
 
 import StepForm from '@/components/StepForm';
+import DateField from '@/components/DateField';
 import { todayISO } from '@/db';
 import { type Debt } from '@/db/schema';
 import { createDebt, rebuildDebt, updateDebtBasic } from '@/services/debts';
@@ -59,6 +61,12 @@ export default function DeudaForm({
       return;
     }
 
+    if (!/^\d+(?:[.,]\d{1,2})?$/.test(amountText.trim()) || !Number.isSafeInteger(Math.round(amount * 100)) || Math.round(amount * 100) < installments || (schedule !== 'unica' && !/^[1-9]\d*$/.test(installmentsText.trim()))) {
+      setSaving(false);
+      Alert.alert('Revisa las cuotas', 'Usa un monto con hasta dos decimales y una cantidad de cuotas que permita al menos un centavo por cuota.');
+      return;
+    }
+
     const granted = await setupNotifications();
     const totalAmountUsd = currency === 'USD' ? amount : rate ? amount / rate : amount;
     const input = {
@@ -103,14 +111,14 @@ export default function DeudaForm({
       submitLabel="Guardar deuda">
       {step === 0 && (
         <View style={{ gap: 14 }}>
-          <TextInput
+          <DictationInput
             label="¿A quién le debes?"
             value={creditor}
             onChangeText={setCreditor}
             mode="outlined"
             autoFocus={!existing}
           />
-          <TextInput
+          <DictationInput
             label="¿Por qué? (opcional)"
             value={description}
             onChangeText={setDescription}
@@ -168,19 +176,10 @@ export default function DeudaForm({
               mode="outlined"
             />
           )}
-          <TextInput
-            label={
-              schedule === 'unica' ? 'Fecha de pago (AAAA-MM-DD)' : 'Primera cuota (AAAA-MM-DD)'
-            }
-            value={dueDate}
-            onChangeText={setDueDate}
-            placeholder={todayISO()}
-            mode="outlined"
-            error={dueDate.length > 0 && !dateOk}
-          />
+          <DateField label={schedule === 'unica' ? 'Fecha de pago' : 'Primera cuota'} value={dueDate} onChange={setDueDate} error={dueDate.length > 0 && !dateOk} />
           {dueDate.length > 0 && !dateOk && (
             <Text style={{ color: 'red', fontSize: 12 }}>
-              Escribe la fecha como 2026-08-15 y que no sea en el pasado.
+              Selecciona una fecha que no sea en el pasado.
             </Text>
           )}
         </View>

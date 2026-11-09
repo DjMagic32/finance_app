@@ -2,9 +2,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { and, eq, gte, isNull, lte } from 'drizzle-orm';
 
 import { db, todayISO } from '@/db';
-import { debtPayments, debts, recurring, transactions } from '@/db/schema';
+import { debtPayments, debts, debtTransactionAllocations, recurring, transactions } from '@/db/schema';
 import { getLatestRates } from '@/services/rates';
 import { Semaforo } from '@/constants/theme';
+import { personalContext, personalTransactionUsd } from '@/services/work';
 
 const SAVINGS_PCT_KEY = 'budget_savings_pct_v1';
 
@@ -67,8 +68,10 @@ export async function computeBudget(): Promise<BudgetStatus> {
     .from(transactions)
     .where(and(gte(transactions.date, start), lte(transactions.date, end)));
 
-  const monthIncome = monthTx.filter((t) => t.type === 'ingreso').reduce((s, t) => s + t.amountUsd, 0);
-  const monthSpent = monthTx.filter((t) => t.type === 'gasto').reduce((s, t) => s + t.amountUsd, 0);
+  const ctx = personalContext();
+  const personalAmount = (t: typeof transactions.$inferSelect) => personalTransactionUsd(t, ctx.receipts, ctx.payments, ctx.conversions);
+  const monthIncome = monthTx.filter((t) => t.type === 'ingreso').reduce((s, t) => s + personalAmount(t), 0);
+  const monthSpent = monthTx.filter((t) => t.type === 'gasto').reduce((s, t) => s + personalAmount(t), 0);
 
   const rates = await getLatestRates();
   const rate = rates.paralelo?.rate ?? rates.bcv?.rate ?? rates.binance_p2p?.rate ?? null;
@@ -89,8 +92,9 @@ export async function computeBudget(): Promise<BudgetStatus> {
     .from(debtPayments)
     .innerJoin(debts, eq(debtPayments.debtId, debts.id))
     .where(and(isNull(debtPayments.paidAt), lte(debtPayments.dueDate, end)));
+  const debtAllocations = await db.select().from(debtTransactionAllocations);
   const debtsUpcoming = pendingPayments.reduce(
-    (s, r) => s + toUsd(r.p.amount, r.d.currency, rate),
+    (s, r) => s + toUsd(Math.max(0, r.p.amount - debtAllocations.filter(a => a.paymentId === r.p.id).reduce((n, a) => n + a.debtAmountCents, 0) / 100), r.d.currency, rate),
     0,
   );
 

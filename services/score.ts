@@ -2,6 +2,7 @@ import { and, eq, gte, isNull, lt, lte } from 'drizzle-orm';
 
 import { db, todayISO } from '@/db';
 import { categories, debtPayments, gamification, transactions } from '@/db/schema';
+import { personalContext, personalTransactionUsd } from '@/services/work';
 import { Semaforo } from '@/constants/theme';
 
 export interface HealthScore {
@@ -29,13 +30,15 @@ export async function computeHealthScore(): Promise<HealthScore> {
     .from(transactions)
     .leftJoin(categories, eq(transactions.categoryId, categories.id))
     .where(and(gte(transactions.date, monthStart), lte(transactions.date, today)));
+  const ctx = personalContext();
+  const amount = (t: typeof transactions.$inferSelect) => personalTransactionUsd(t, ctx.receipts, ctx.payments, ctx.conversions);
 
   const ingresos = monthTx
     .filter((r) => r.tx.type === 'ingreso')
-    .reduce((s, r) => s + r.tx.amountUsd, 0);
+    .reduce((s, r) => s + amount(r.tx), 0);
   const gastos = monthTx
     .filter((r) => r.tx.type === 'gasto')
-    .reduce((s, r) => s + r.tx.amountUsd, 0);
+    .reduce((s, r) => s + amount(r.tx), 0);
 
   // Balance: 40 pts si gastos <= ingresos; baja linealmente a 0 cuando gastos = 150% ingresos
   let balance: number;
@@ -68,7 +71,7 @@ export async function computeHealthScore(): Promise<HealthScore> {
   // Gasto esencial: >= 60% en categorías esenciales → 20 pts, lineal por debajo
   const gastoEsencial = monthTx
     .filter((r) => r.tx.type === 'gasto' && r.cat?.isEssential === 1)
-    .reduce((s, r) => s + r.tx.amountUsd, 0);
+    .reduce((s, r) => s + amount(r.tx), 0);
   let esencial: number;
   if (gastos <= 0) esencial = 20;
   else esencial = Math.min(20, Math.round((gastoEsencial / gastos / 0.6) * 20));
@@ -183,12 +186,14 @@ export async function evaluateExpenseRisk(amountUsd: number): Promise<string | n
     .select()
     .from(transactions)
     .where(and(gte(transactions.date, monthStart), lte(transactions.date, today)));
+  const ctx = personalContext();
+  const amount = (t: typeof transactions.$inferSelect) => personalTransactionUsd(t, ctx.receipts, ctx.payments, ctx.conversions);
 
   const ingresos = monthTx
     .filter((t) => t.type === 'ingreso')
-    .reduce((s, t) => s + t.amountUsd, 0);
+    .reduce((s, t) => s + amount(t), 0);
   const gastos =
-    monthTx.filter((t) => t.type === 'gasto').reduce((s, t) => s + t.amountUsd, 0) + amountUsd;
+    monthTx.filter((t) => t.type === 'gasto').reduce((s, t) => s + amount(t), 0) + amountUsd;
 
   if (ingresos > 0 && amountUsd > ingresos * 0.2) {
     const pct = Math.round((amountUsd / ingresos) * 100);

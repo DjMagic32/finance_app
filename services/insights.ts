@@ -3,6 +3,7 @@ import { and, desc, eq, gte, lte, sql } from 'drizzle-orm';
 import { db, todayISO } from '@/db';
 import { categories, transactions } from '@/db/schema';
 import { Semaforo } from '@/constants/theme';
+import { personalContext, personalTransactionUsd } from '@/services/work';
 
 export type Severity = 'ok' | 'warn' | 'alert';
 
@@ -45,12 +46,14 @@ async function aggregate(start: string, end: string): Promise<MonthAgg> {
   let income = 0;
   let spent = 0;
   const byCat = new Map<number, number>();
+  const ctx = personalContext();
   for (const t of rows) {
-    if (t.type === 'ingreso') income += t.amountUsd;
+    const amountUsd = personalTransactionUsd(t, ctx.receipts, ctx.payments, ctx.conversions);
+    if (t.type === 'ingreso') income += amountUsd;
     else {
-      spent += t.amountUsd;
+      spent += amountUsd;
       if (t.categoryId != null) {
-        byCat.set(t.categoryId, (byCat.get(t.categoryId) ?? 0) + t.amountUsd);
+        byCat.set(t.categoryId, (byCat.get(t.categoryId) ?? 0) + amountUsd);
       }
     }
   }

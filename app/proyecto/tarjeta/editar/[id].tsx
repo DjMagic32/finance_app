@@ -1,3 +1,4 @@
+import DictationInput from '@/components/DictationInput';
 import { eq } from 'drizzle-orm';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -69,8 +70,8 @@ export default function EditarTarjetaScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Stack.Screen options={{ title: 'Editar tarjeta' }} />
       <ScrollView contentContainerStyle={styles.content}>
-        <TextInput label="Título" value={title} onChangeText={setTitle} mode="outlined" />
-        <TextInput
+        <DictationInput label="Título" value={title} onChangeText={setTitle} mode="outlined" />
+        <DictationInput
           label="Notas"
           value={note}
           onChangeText={setNote}

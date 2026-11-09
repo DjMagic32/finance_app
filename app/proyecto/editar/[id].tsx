@@ -1,3 +1,4 @@
+import DictationInput from '@/components/DictationInput';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { eq } from 'drizzle-orm';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -92,8 +93,8 @@ export default function EditarTableroScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Stack.Screen options={{ title: 'Editar tablero' }} />
       <ScrollView contentContainerStyle={styles.content}>
-        <TextInput label="Nombre" value={name} onChangeText={setName} mode="outlined" />
-        <TextInput
+        <DictationInput label="Nombre" value={name} onChangeText={setName} mode="outlined" />
+        <DictationInput
           label="Descripción"
           value={description}
           onChangeText={setDescription}

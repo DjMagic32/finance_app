@@ -1,3 +1,4 @@
+import DictationInput from '@/components/DictationInput';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { and, desc, eq, isNull } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
@@ -264,7 +265,7 @@ export default function TarjetaScreen() {
 
           {editingTitle ? (
             <View style={{ gap: 8 }}>
-              <TextInput
+              <DictationInput
                 value={titleDraft}
                 onChangeText={setTitleDraft}
                 mode="flat"
@@ -336,7 +337,7 @@ export default function TarjetaScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Notas</Text>
-          <TextInput
+          <DictationInput
             value={noteDraft}
             onChangeText={setNoteDraft}
             onBlur={saveNote}
@@ -376,7 +377,7 @@ export default function TarjetaScreen() {
             </View>
           ))}
           <View style={styles.newSubRow}>
-            <TextInput
+            <DictationInput
               value={newSubtask}
               onChangeText={setNewSubtask}
               mode="outlined"
@@ -612,7 +613,7 @@ function AllocationPickerDialog({
           <>
             <Dialog.Title>Elegir movimiento</Dialog.Title>
             <Dialog.Content>
-              <TextInput
+              <DictationInput
                 value={query}
                 onChangeText={setQuery}
                 mode="outlined"

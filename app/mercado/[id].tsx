@@ -1,3 +1,4 @@
+import DictationInput from '@/components/DictationInput';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { eq } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
@@ -229,7 +230,7 @@ export default function DetalleMercado() {
             <Text variant="titleMedium" style={{ textAlign: 'right', marginTop: 8 }}>
               Total comprado: ≈ ${fmt(total)}
             </Text>
-          ) : null
+          ) : undefined
         }
       />
 
@@ -237,7 +238,7 @@ export default function DetalleMercado() {
         <Dialog visible={editing != null} onDismiss={() => setEditing(null)}>
           <Dialog.Title>{editing === 'new' ? 'Nuevo producto' : 'Editar producto'}</Dialog.Title>
           <Dialog.Content style={{ gap: 10 }}>
-            <TextInput label="Producto" value={name} onChangeText={setName} mode="outlined" />
+            <DictationInput label="Producto" value={name} onChangeText={setName} mode="outlined" />
             <View style={{ flexDirection: 'row', gap: 8 }}>
               <TextInput
                 label="Cantidad"

@@ -1,3 +1,4 @@
+import DictationInput from '@/components/DictationInput';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { desc, eq } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
@@ -139,8 +140,8 @@ export default function NotasScreen() {
                 { value: 'meta', label: 'Meta de ahorro' },
               ]}
             />
-            <TextInput label="Título" value={title} onChangeText={setTitle} mode="outlined" />
-            <TextInput
+            <DictationInput label="Título" value={title} onChangeText={setTitle} mode="outlined" />
+            <DictationInput
               label="Detalle (opcional)"
               value={body}
               onChangeText={setBody}

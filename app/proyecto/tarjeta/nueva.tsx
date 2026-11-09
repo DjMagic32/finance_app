@@ -1,3 +1,4 @@
+import DictationInput from '@/components/DictationInput';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
@@ -43,7 +44,7 @@ export default function NuevaTarjetaScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Stack.Screen options={{ title: 'Nueva tarjeta' }} />
       <ScrollView contentContainerStyle={styles.content}>
-        <TextInput
+        <DictationInput
           label="Título"
           value={title}
           onChangeText={setTitle}
@@ -51,7 +52,7 @@ export default function NuevaTarjetaScreen() {
           placeholder="Ej: Comprar inversor"
           autoFocus
         />
-        <TextInput
+        <DictationInput
           label="Notas (opcional)"
           value={note}
           onChangeText={setNote}

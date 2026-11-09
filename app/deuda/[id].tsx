@@ -3,20 +3,23 @@ import { eq } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Alert, FlatList, View } from 'react-native';
+import { useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, Card, Divider, Text } from 'react-native-paper';
 
 import { AppColors, Semaforo } from '@/constants/theme';
 import { db, todayISO } from '@/db';
-import { debtPayments, debts } from '@/db/schema';
+import { debtPayments, debts, debtTransactionAllocations } from '@/db/schema';
 import { amountLabel, deleteDebt, markPaymentPaid } from '@/services/debts';
 import { awardBadge } from '@/services/score';
+import { sharePaidDebtReceipt } from '@/services/debtReceipt';
 
 export default function DetalleDeuda() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const debtId = Number(id);
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [sharing, setSharing] = useState(false);
 
   const { data: debtRows } = useLiveQuery(
     db.select().from(debts).where(eq(debts.id, debtId)),
@@ -26,12 +29,17 @@ export default function DetalleDeuda() {
     db.select().from(debtPayments).where(eq(debtPayments.debtId, debtId)).orderBy(debtPayments.dueDate),
     [debtId],
   );
+  const { data: allocations } = useLiveQuery(db.select().from(debtTransactionAllocations));
 
   const debt = debtRows?.[0];
   if (!debt) return null;
 
   const today = todayISO();
-  const paid = (payments ?? []).filter((p) => p.paidAt).reduce((s, p) => s + p.amount, 0);
+  const paidFor = (p: typeof debtPayments.$inferSelect) => {
+    const linked = (allocations ?? []).filter(a => a.paymentId === p.id).reduce((n, a) => n + a.debtAmountCents, 0) / 100;
+    return p.paidAt ? p.amount : Math.min(p.amount, linked);
+  };
+  const paid = (payments ?? []).reduce((s, p) => s + paidFor(p), 0);
   const progress = debt.totalAmount > 0 ? paid / debt.totalAmount : 0;
 
   const onPay = (paymentId: number) => {
@@ -40,7 +48,8 @@ export default function DetalleDeuda() {
       {
         text: 'Sí, ya pagué',
         onPress: async () => {
-          await markPaymentPaid(paymentId);
+          try { await markPaymentPaid(paymentId); }
+          catch (e: any) { Alert.alert('No se pudo marcar', e?.message ?? 'Inténtalo nuevamente.'); return; }
           const pending = (payments ?? []).filter((p) => !p.paidAt && p.id !== paymentId);
           if (pending.length === 0) {
             const isNew = await awardBadge('deuda_pagada');
@@ -68,11 +77,19 @@ export default function DetalleDeuda() {
     ]);
   };
 
+  const onShare = async () => {
+    setSharing(true);
+    try { await sharePaidDebtReceipt(debtId); }
+    catch (e: any) { Alert.alert('No se pudo generar el PDF', e?.message ?? 'Inténtalo de nuevo.'); }
+    finally { setSharing(false); }
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: AppColors.fondo }}>
       <Stack.Screen options={{ title: debt.creditor }} />
       <FlatList
         data={payments ?? []}
+        extraData={allocations}
         keyExtractor={(p) => String(p.id)}
         contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 32 + insets.bottom }}
         ListHeaderComponent={
@@ -83,6 +100,7 @@ export default function DetalleDeuda() {
               <Text style={{ marginTop: 8, color: Semaforo.verde }}>
                 Pagado: {amountLabel(paid, debt.currency)} ({Math.round(progress * 100)}%)
               </Text>
+              <Text>Pendiente: {amountLabel(Math.max(0, debt.totalAmount - paid), debt.currency)}</Text>
               <Divider style={{ marginVertical: 8 }} />
               <Text variant="titleSmall">Cuotas</Text>
             </Card.Content>
@@ -102,6 +120,7 @@ export default function DetalleDeuda() {
                   <Text style={{ color: '#888', fontSize: 12 }}>
                     {overdue ? '¡Vencida! ' : ''}Vence: {p.dueDate.split('-').reverse().join('/')}
                   </Text>
+                  {paidFor(p) > 0 && <Text style={{ fontSize: 12 }}>Abonado: {amountLabel(paidFor(p), debt.currency)}</Text>}
                 </View>
                 {!p.paidAt && (
                   <Button mode="contained-tonal" compact onPress={() => onPay(p.id)}>
@@ -114,6 +133,7 @@ export default function DetalleDeuda() {
         }}
         ListFooterComponent={
           <View style={{ marginTop: 12, gap: 4 }}>
+            {debt.status === 'pagada' && <Button icon="file-pdf-box" mode="contained-tonal" onPress={() => void onShare()} loading={sharing} disabled={sharing}>Compartir registro PDF</Button>}
             <Button icon="pencil" onPress={() => router.push(`/deuda/editar/${debtId}`)}>
               Editar deuda
             </Button>

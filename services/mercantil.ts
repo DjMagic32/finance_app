@@ -3,11 +3,18 @@ import * as SecureStore from 'expo-secure-store';
 import { and, eq, gte, lte, sql } from 'drizzle-orm';
 
 import { db, nowISO } from '@/db';
-import { transactions } from '@/db/schema';
+import { transactions, debtTransactionAllocations } from '@/db/schema';
 import { getLatestRates } from '@/services/rates';
 
 const PASSWORD_STORE = 'mercantil_password';
 const USERNAME_STORE = 'mercantil_username';
+const PROTECTED_STORE = 'mercantil_biometric_credentials_v1';
+const PROTECTED_MARKER = 'mercantil_biometric_configured_v1';
+const PROTECTED_OPTIONS: SecureStore.SecureStoreOptions = {
+  requireAuthentication: true,
+  keychainService: 'mercantil_biometric_v1',
+  authenticationPrompt: 'Confirma tu identidad para usar tus datos de Mercantil',
+};
 
 export const MERCANTIL_SOURCE = 'mercantil_pdf';
 export const MERCANTIL_URL = 'https://www30.mercantilbanco.com/login';
@@ -20,6 +27,30 @@ const CLIPBOARD_CLEAR_MS = 45_000;
 export interface MercantilCreds {
   username: string;
   password: string;
+}
+
+export async function hasProtectedMercantilCreds(): Promise<boolean> {
+  return (await SecureStore.getItemAsync(PROTECTED_MARKER)) === '1';
+}
+
+export async function saveProtectedMercantilCreds(creds: MercantilCreds): Promise<void> {
+  if (!creds.username.trim() || !creds.password) throw new Error('Introduce tu usuario y clave.');
+  await SecureStore.setItemAsync(PROTECTED_STORE, JSON.stringify({ username: creds.username.trim(), password: creds.password }), PROTECTED_OPTIONS);
+  await SecureStore.setItemAsync(PROTECTED_MARKER, '1');
+  await SecureStore.deleteItemAsync(USERNAME_STORE);
+  await SecureStore.deleteItemAsync(PASSWORD_STORE);
+}
+
+export async function unlockMercantilCreds(): Promise<MercantilCreds | null> {
+  const value = await SecureStore.getItemAsync(PROTECTED_STORE, PROTECTED_OPTIONS);
+  return value ? JSON.parse(value) as MercantilCreds : null;
+}
+
+export async function deleteProtectedMercantilCreds(): Promise<void> {
+  await SecureStore.deleteItemAsync(PROTECTED_STORE, PROTECTED_OPTIONS);
+  await SecureStore.deleteItemAsync(PROTECTED_MARKER);
+  await SecureStore.deleteItemAsync(USERNAME_STORE);
+  await SecureStore.deleteItemAsync(PASSWORD_STORE);
 }
 
 export async function saveMercantilCreds(creds: Partial<MercantilCreds>): Promise<void> {
@@ -115,6 +146,7 @@ export async function importMovements(movs: ParsedMovement[]): Promise<ImportSum
         eq(transactions.externalSource, 'mercantil_notif'),
         gte(transactions.date, fromDate),
         lte(transactions.date, toDate),
+        sql`not exists (select 1 from ${debtTransactionAllocations} where ${debtTransactionAllocations.transactionId} = ${transactions.id})`,
       ),
     );
 

@@ -1,3 +1,4 @@
+import DictationInput from '@/components/DictationInput';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -71,7 +72,7 @@ export default function NuevoTableroScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Stack.Screen options={{ title: 'Nuevo tablero' }} />
       <ScrollView contentContainerStyle={styles.content}>
-        <TextInput
+        <DictationInput
           label="Nombre del tablero"
           value={name}
           onChangeText={setName}
@@ -79,7 +80,7 @@ export default function NuevoTableroScreen() {
           placeholder="Ej: Inversor solar"
           autoFocus
         />
-        <TextInput
+        <DictationInput
           label="Descripción (opcional)"
           value={description}
           onChangeText={setDescription}

@@ -17,9 +17,9 @@ import {
 import { getBudgetConfig, setBudgetConfig } from '@/services/budget';
 import { exportTransactionsCSV } from '@/services/export';
 import {
-  copyPasswordWithAutoClear,
-  getMercantilCreds,
-  saveMercantilCreds,
+  deleteProtectedMercantilCreds,
+  hasProtectedMercantilCreds,
+  saveProtectedMercantilCreds,
 } from '@/services/mercantil';
 import { setDailyHabitReminder, setupNotifications } from '@/services/notifications';
 
@@ -50,6 +50,7 @@ export default function AjustesScreen() {
   const [mercPass, setMercPass] = useState('');
   const [showMercPass, setShowMercPass] = useState(false);
   const [savingMerc, setSavingMerc] = useState(false);
+  const [mercConfigured, setMercConfigured] = useState(false);
 
   // --- Datos ---
   const [exporting, setExporting] = useState(false);
@@ -69,9 +70,7 @@ export default function AjustesScreen() {
         }
       }
 
-      const mc = await getMercantilCreds();
-      setMercUser(mc.username);
-      setMercPass(mc.password);
+      setMercConfigured(await hasProtectedMercantilCreds());
 
       const cfg = await getBudgetConfig();
       setSavingsPct(cfg.savingsPct);
@@ -146,7 +145,10 @@ export default function AjustesScreen() {
   const onSaveMerc = async () => {
     setSavingMerc(true);
     try {
-      await saveMercantilCreds({ username: mercUser, password: mercPass });
+      await saveProtectedMercantilCreds({ username: mercUser, password: mercPass });
+      setMercConfigured(true);
+      setMercUser('');
+      setMercPass('');
       setSnack('Datos de Mercantil guardados.');
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? String(e));
@@ -155,18 +157,12 @@ export default function AjustesScreen() {
     }
   };
 
-  const onCopyMercPass = async () => {
-    if (!mercPass) return;
-    if (clearHandle.current) clearTimeout(clearHandle.current);
-    clearHandle.current = await copyPasswordWithAutoClear(mercPass);
-    setSnack('Clave copiada. Se borra del portapapeles en 45 s.');
-  };
-
-  const onCopyMercUser = async () => {
-    if (!mercUser) return;
-    const clip = await import('expo-clipboard');
-    await clip.setStringAsync(mercUser);
-    setSnack('Usuario copiado.');
+  const onDeleteMerc = async () => {
+    try {
+      await deleteProtectedMercantilCreds();
+      setMercConfigured(false);
+      setSnack('Datos de Mercantil eliminados.');
+    } catch (e: any) { Alert.alert('Error', e?.message ?? String(e)); }
   };
 
   const onExport = async () => {
@@ -296,16 +292,15 @@ export default function AjustesScreen() {
                 Mercantil
               </Text>
               <Chip
-                icon={mercUser && mercPass ? 'check-circle' : 'alert-circle-outline'}
+                icon={mercConfigured ? 'check-circle' : 'alert-circle-outline'}
                 compact
-                style={{ backgroundColor: mercUser && mercPass ? '#E8F5E9' : '#FFF3E0' }}>
-                {mercUser && mercPass ? 'Guardado' : 'Sin guardar'}
+                style={{ backgroundColor: mercConfigured ? '#E8F5E9' : '#FFF3E0' }}>
+                {mercConfigured ? 'Guardado' : 'Sin guardar'}
               </Chip>
             </View>
             <Text style={{ color: '#666', fontSize: 13 }}>
-              Bóveda de tu usuario y clave del banco. La app no los usa sola: al abrir el banco, tú
-              tocas "Copiar" y los pegas en el login. La clave copiada se auto-borra del portapapeles
-              en 45 segundos.
+              Guarda tu usuario y clave protegidos por la autenticación biométrica del teléfono.
+              Para cambiarlos, introduce ambos nuevamente.
             </Text>
             <TextInput
               label="Usuario"
@@ -314,7 +309,6 @@ export default function AjustesScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               mode="outlined"
-              right={mercUser ? <TextInput.Icon icon="content-copy" onPress={onCopyMercUser} /> : undefined}
             />
             <TextInput
               label="Clave"
@@ -332,8 +326,8 @@ export default function AjustesScreen() {
               <Button mode="contained" icon="content-save" onPress={onSaveMerc} loading={savingMerc} style={{ flex: 1 }}>
                 Guardar
               </Button>
-              <Button mode="outlined" icon="content-copy" onPress={onCopyMercPass} disabled={!mercPass} style={{ flex: 1 }}>
-                Copiar clave
+              <Button mode="outlined" icon="delete" onPress={onDeleteMerc} disabled={!mercConfigured} style={{ flex: 1 }}>
+                Eliminar
               </Button>
             </View>
             <Button mode="text" icon="bank" onPress={() => router.push('/mercantil' as never)}>

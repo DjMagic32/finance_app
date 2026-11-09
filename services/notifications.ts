@@ -1,7 +1,12 @@
-import * as Notifications from 'expo-notifications';
+import { isRunningInExpoGo } from 'expo';
 import { Platform } from 'react-native';
 
-Notifications.setNotificationHandler({
+// Expo Go for Android cannot load the remote notifications module.
+// Keep the rest of the app usable there; development builds retain reminders.
+const Notifications: typeof import('expo-notifications') | null =
+  Platform.OS === 'android' && isRunningInExpoGo() ? null : require('expo-notifications');
+
+Notifications?.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowBanner: true,
     shouldShowList: true,
@@ -11,6 +16,7 @@ Notifications.setNotificationHandler({
 });
 
 export async function setupNotifications(): Promise<boolean> {
+  if (!Notifications) return false;
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('deudas', {
       name: 'Deudas y pagos',
@@ -32,6 +38,7 @@ function at(dateISO: string, hour: number): Date | null {
 }
 
 async function schedule(title: string, body: string, when: Date): Promise<string> {
+  if (!Notifications) throw new Error('Notificaciones no disponibles en Expo Go');
   return Notifications.scheduleNotificationAsync({
     content: { title, body, sound: true },
     trigger: {
@@ -87,6 +94,7 @@ export async function schedulePaymentReminders(
 }
 
 export async function cancelReminders(ids: string[]) {
+  if (!Notifications) return;
   for (const id of ids) {
     try {
       await Notifications.cancelScheduledNotificationAsync(id);
@@ -109,6 +117,7 @@ export async function scheduleOverdueAlert(creditor: string, amountLabel: string
 const HABIT_ID_KEY = 'habit-reminder';
 
 export async function setDailyHabitReminder(enabled: boolean) {
+  if (!Notifications) return;
   await Notifications.cancelScheduledNotificationAsync(HABIT_ID_KEY).catch(() => {});
   if (!enabled) return;
   await Notifications.scheduleNotificationAsync({

@@ -1,6 +1,6 @@
 import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Modal, RefreshControl, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,11 +24,11 @@ import {
   MERCANTIL_STATEMENTS_URL,
   MERCANTIL_URL,
   ParsedMovement,
-  copyPasswordWithAutoClear,
   countMercantilMovements,
-  getMercantilCreds,
+  hasProtectedMercantilCreds,
   importMovements,
   isMercantilUrl,
+  unlockMercantilCreds,
 } from '@/services/mercantil';
 
 const DOWNLOAD_INTERCEPT_JS = `
@@ -85,46 +85,104 @@ const DOWNLOAD_INTERCEPT_JS = `
 true;
 `;
 
+// Only follows the account-detail/download path; never interacts with payments.
+const SYNC_JS = `
+(function() {
+  if (window.__mercantilSyncRunning) return;
+  window.__mercantilSyncRunning = true;
+  const post = (m) => window.ReactNativeWebView.postMessage(JSON.stringify(m));
+  const findText = (selector, text) => Array.from(document.querySelectorAll(selector))
+    .find((el) => el.textContent.trim() === text && el.getClientRects().length);
+  let stage = location.pathname.includes('/summary') ? 0 : 2;
+  let attempts = 0;
+  const timer = setInterval(() => {
+    try {
+      let el = null;
+      if (stage === 0) el = findText('.detail-section-card-options__value', 'Más opciones');
+      if (stage === 1) el = findText('.panel-option__value', 'Ver detalle de cuenta');
+      if (stage === 2) el = findText('.icon-button__text', 'Descargar');
+      if (stage === 3) el = document.querySelector('img[alt="xlsIcon"]');
+      if (el && el.getClientRects().length) {
+        el.click();
+        stage++;
+        attempts = 0;
+        if (stage === 4) {
+          clearInterval(timer);
+          window.__mercantilSyncRunning = false;
+          post({ type: 'sync_download_requested' });
+        }
+      } else if (++attempts > 30) {
+        clearInterval(timer);
+        window.__mercantilSyncRunning = false;
+        post({ type: 'sync_error', message: 'No encontré el siguiente botón. Revisa que estés en el resumen o detalle de tu cuenta.' });
+      }
+    } catch (e) {
+      clearInterval(timer);
+      window.__mercantilSyncRunning = false;
+      post({ type: 'sync_error', message: (e && e.message) || String(e) });
+    }
+  }, 1000);
+})(); true;
+`;
+
 export default function MercantilScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
   const [hasCreds, setHasCreds] = useState(false);
-  const [savedPassword, setSavedPassword] = useState('');
   const [movementsCount, setMovementsCount] = useState<number>(0);
   const [refreshing, setRefreshing] = useState(false);
 
   const [webOpen, setWebOpen] = useState(false);
   const [webUrl, setWebUrl] = useState<string>(MERCANTIL_URL);
   const [webBusy, setWebBusy] = useState(false);
-  const webRef = useRef<WebView>(null);
+  const webRef = useRef<WebView<{}>>(null);
 
   const [pdfBase64, setPdfBase64] = useState<string | null>(null);
   const [xlsxBase64, setXlsxBase64] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [snack, setSnack] = useState<string | null>(null);
-  const clearHandle = useRef<number | null>(null);
+  const currentUrl = useRef(MERCANTIL_URL);
 
   const loadState = useCallback(async () => {
-    const c = await getMercantilCreds();
-    setHasCreds(!!c.username && !!c.password);
-    setSavedPassword(c.password);
+    setHasCreds(await hasProtectedMercantilCreds());
     setMovementsCount(await countMercantilMovements());
     setRefreshing(false);
   }, []);
 
-  useEffect(() => {
-    loadState();
-    return () => {
-      if (clearHandle.current) clearTimeout(clearHandle.current);
-    };
-  }, [loadState]);
+  useFocusEffect(useCallback(() => { void loadState(); }, [loadState]));
 
-  const onCopyPassword = async () => {
-    if (!savedPassword) return;
-    if (clearHandle.current) clearTimeout(clearHandle.current);
-    clearHandle.current = await copyPasswordWithAutoClear(savedPassword);
-    setSnack('Copiada. Se borra del portapapeles en 45 s.');
+  const onBiometricLogin = async () => {
+    try {
+      const url = new URL(currentUrl.current);
+      if (url.origin !== 'https://www30.mercantilbanco.com' || url.pathname !== '/login') {
+        Alert.alert('Inicio de sesión', 'Abre primero la pantalla de inicio de sesión de Mercantil.');
+        return;
+      }
+      const creds = await unlockMercantilCreds();
+      if (!creds) {
+        Alert.alert('Datos no disponibles', 'Guarda nuevamente tu usuario y clave en Ajustes.');
+        return;
+      }
+      const payload = JSON.stringify(creds).replace(/</g, '\\u003c');
+      webRef.current?.injectJavaScript(`(function() {
+        if (location.origin !== 'https://www30.mercantilbanco.com' || location.pathname !== '/login') return;
+        const data = ${payload};
+        const pass = document.querySelector('input#password[type="password"]');
+        const user = document.querySelector('input#username, input#user, input[name*="username"], input[name*="usuario"]');
+        const set = (el, value) => {
+          Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, value);
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+        };
+        if (!pass) { window.ReactNativeWebView.postMessage(JSON.stringify({type:'login_error'})); return; }
+        if (user) set(user, data.username);
+        set(pass, data.password);
+        window.ReactNativeWebView.postMessage(JSON.stringify({type:'login_filled'}));
+      })(); true;`);
+    } catch {
+      Alert.alert('No se pudo desbloquear', 'Comprueba tu huella o vuelve a guardar tus datos en Ajustes.');
+    }
   };
 
   const onOpenBankWeb = () => {
@@ -137,9 +195,20 @@ export default function MercantilScreen() {
       const msg = JSON.parse(ev.nativeEvent.data);
       if (msg.type === 'pdf') {
         setWebBusy(true);
-        setPdfBase64(msg.base64);
-      } else if (msg.type === 'download_error') {
-        Alert.alert('No se pudo capturar el PDF', msg.message ?? '');
+        if (typeof msg.base64 === 'string' && (msg.base64.startsWith('UEsDB') || msg.base64.startsWith('0M8R4'))) {
+          setXlsxBase64(msg.base64);
+        } else {
+          setPdfBase64(msg.base64);
+        }
+      } else if (msg.type === 'sync_download_requested') {
+        setSnack('Descarga solicitada; esperando el archivo...');
+      } else if (msg.type === 'login_filled') {
+        setSnack('Datos completados. Pulsa Iniciar en el banco.');
+      } else if (msg.type === 'login_error') {
+        Alert.alert('Inicio de sesión', 'No encontré los campos de acceso del banco.');
+      } else if (msg.type === 'download_error' || msg.type === 'sync_error') {
+        setWebBusy(false);
+        Alert.alert('No se pudo sincronizar', msg.message ?? '');
       }
     } catch {
       // ignoramos
@@ -147,6 +216,7 @@ export default function MercantilScreen() {
   };
 
   const onWebNav = (nav: WebViewNavigation) => {
+    currentUrl.current = nav.url;
     if (!isMercantilUrl(nav.url)) {
       webRef.current?.stopLoading();
       webRef.current?.goBack();
@@ -197,7 +267,7 @@ export default function MercantilScreen() {
   };
 
   const onParseResult = async (movs: ParsedMovement[]) => {
-    console.log('[Mercantil] parse result count=', movs.length, 'first=', movs[0]);
+    console.log('[Mercantil] parse result count=', movs.length);
     setPdfBase64(null);
     setXlsxBase64(null);
     if (movs.length === 0) {
@@ -274,11 +344,6 @@ export default function MercantilScreen() {
             <Button mode="contained" icon="web" onPress={onOpenBankWeb}>
               Abrir banco y descargar
             </Button>
-            {hasCreds && (
-              <Button mode="text" icon="content-copy" onPress={onCopyPassword}>
-                Copiar clave (auto-borra a 45 s)
-              </Button>
-            )}
             <Divider style={{ marginVertical: 4 }} />
             <Button mode="outlined" icon="file-upload" onPress={onPickPdf}>
               Importar PDF o Excel desde el teléfono
@@ -295,6 +360,8 @@ export default function MercantilScreen() {
           <Appbar.Header>
             <Appbar.BackAction onPress={() => setWebOpen(false)} />
             <Appbar.Content title="Mercantil" subtitle={webUrl} />
+            {hasCreds && <Appbar.Action icon="fingerprint" accessibilityLabel="Iniciar con biometría" onPress={onBiometricLogin} />}
+            <Appbar.Action icon="sync" accessibilityLabel="Sincronizar movimientos" onPress={() => webRef.current?.injectJavaScript(SYNC_JS)} />
             <Appbar.Action icon="file-document" onPress={goToStatements} />
             <Appbar.Action icon="refresh" onPress={() => webRef.current?.reload()} />
           </Appbar.Header>
@@ -311,7 +378,7 @@ export default function MercantilScreen() {
               <Text>Descargando y leyendo el PDF...</Text>
             </View>
           )}
-          <WebView
+          <WebView<{}>
             ref={webRef}
             source={{ uri: webUrl }}
             originWhitelist={['https://*.mercantilbanco.com', 'https://mercantilbanco.com']}

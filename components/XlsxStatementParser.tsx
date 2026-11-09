@@ -148,7 +148,7 @@ const HTML = `<!doctype html><html><head><meta charset="utf-8" /></head><body>
 </body></html>`;
 
 export function XlsxStatementParser({ base64, onResult, onError }: Props) {
-  const webRef = useRef<WebView>(null);
+  const webRef = useRef<WebView<{}>>(null);
   const readyRef = useRef(false);
   const pendingRef = useRef<string | null>(null);
 
@@ -169,7 +169,7 @@ export function XlsxStatementParser({ base64, onResult, onError }: Props) {
 
   return (
     <View style={{ width: 0, height: 0, opacity: 0, position: 'absolute' }} pointerEvents="none">
-      <WebView
+      <WebView<{}>
         ref={webRef}
         source={source}
         originWhitelist={['*']}

@@ -9,7 +9,8 @@ import { Button, Card, Dialog, Portal, Text } from 'react-native-paper';
 import { S } from '@/constants/strings';
 import { AppColors, Semaforo } from '@/constants/theme';
 import { db, todayISO } from '@/db';
-import { transactions } from '@/db/schema';
+import { transactions, workReceipts, workDisbursements, workConversions, debtTransactionAllocations } from '@/db/schema';
+import { personalTransactionUsd } from '@/services/work';
 import { computeBudget, type BudgetStatus } from '@/services/budget';
 import { computeInsights, type Insight } from '@/services/insights';
 import { getLatestRates, refreshRates, type RateInfo, type Rates } from '@/services/rates';
@@ -84,6 +85,10 @@ export default function InicioScreen() {
       .where(and(gte(transactions.date, start), lte(transactions.date, end))),
     [start, end],
   );
+  const { data: workReceiptRows } = useLiveQuery(db.select().from(workReceipts));
+  const { data: workPaymentRows } = useLiveQuery(db.select().from(workDisbursements));
+  const { data: workConversionRows } = useLiveQuery(db.select().from(workConversions));
+  const { data: debtAllocationRows } = useLiveQuery(db.select().from(debtTransactionAllocations));
 
   const load = async () => {
     setRates(await getLatestRates());
@@ -100,14 +105,16 @@ export default function InicioScreen() {
     computeBudget().then(setBudget);
     computeInsights().then(setInsights);
     getGamState().then((g) => setStreak(g.streakDays));
-  }, [monthTx]);
+  }, [monthTx, workReceiptRows, workPaymentRows, workConversionRows, debtAllocationRows]);
+
+  const personalAmount = (t: typeof transactions.$inferSelect) => personalTransactionUsd(t, workReceiptRows ?? [], workPaymentRows ?? [], workConversionRows ?? []);
 
   const ingresos = (monthTx ?? [])
     .filter((t) => t.type === 'ingreso')
-    .reduce((s, t) => s + t.amountUsd, 0);
+    .reduce((s, t) => s + personalAmount(t), 0);
   const gastos = (monthTx ?? [])
     .filter((t) => t.type === 'gasto')
-    .reduce((s, t) => s + t.amountUsd, 0);
+    .reduce((s, t) => s + personalAmount(t), 0);
   const saldo = ingresos - gastos;
   const saldoColor = saldo >= 0 ? Semaforo.verde : Semaforo.rojo;
 

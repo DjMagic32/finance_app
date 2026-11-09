@@ -9,7 +9,8 @@ import { LineChart, PieChart } from 'react-native-gifted-charts';
 import { S } from '@/constants/strings';
 import { AppColors, Semaforo } from '@/constants/theme';
 import { db, todayISO } from '@/db';
-import { categories, transactions } from '@/db/schema';
+import { categories, transactions, workReceipts, workDisbursements, workConversions } from '@/db/schema';
+import { personalTransactionUsd } from '@/services/work';
 import { getRateHistory } from '@/services/rates';
 
 function fmt(n: number) {
@@ -30,12 +31,16 @@ export default function AnalisisScreen() {
   );
 
   const [rateHistory, setRateHistory] = useState<Array<{ date: string; rate: number }>>([]);
+  const { data: receipts } = useLiveQuery(db.select().from(workReceipts));
+  const { data: payments } = useLiveQuery(db.select().from(workDisbursements));
+  const { data: conversions } = useLiveQuery(db.select().from(workConversions));
+  const amount = (t: typeof transactions.$inferSelect) => personalTransactionUsd(t, receipts ?? [], payments ?? [], conversions ?? []);
   useEffect(() => {
     getRateHistory('paralelo').then(setRateHistory);
   }, [monthTx]);
 
   const gastos = (monthTx ?? []).filter((r) => r.tx.type === 'gasto');
-  const totalGastos = gastos.reduce((s, r) => s + r.tx.amountUsd, 0);
+  const totalGastos = gastos.reduce((s, r) => s + amount(r.tx), 0);
 
   const byCategory = (() => {
     const map = new Map<string, { value: number; color: string }>();
@@ -43,7 +48,7 @@ export default function AnalisisScreen() {
       const name = r.cat?.name ?? 'Sin categoría';
       const color = r.cat?.color ?? '#888';
       const prev = map.get(name)?.value ?? 0;
-      map.set(name, { value: prev + r.tx.amountUsd, color });
+      map.set(name, { value: prev + amount(r.tx), color });
     }
     return [...map.entries()]
       .map(([name, v]) => ({ name, ...v }))

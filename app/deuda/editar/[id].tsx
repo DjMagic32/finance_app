@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 
 import DeudaForm from '@/components/DeudaForm';
 import { db } from '@/db';
-import { debtPayments, debts, type Debt, type DebtPayment } from '@/db/schema';
+import { debtPayments, debts, debtTransactionAllocations, type Debt, type DebtPayment } from '@/db/schema';
 
 export default function EditarDeuda() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -32,7 +32,7 @@ export default function EditarDeuda() {
   return (
     <DeudaForm
       existing={data.debt}
-      hasPaid={data.payments.some((p) => p.paidAt)}
+      hasPaid={data.payments.some((p) => p.paidAt || !!db.select().from(debtTransactionAllocations).where(eq(debtTransactionAllocations.paymentId, p.id)).get())}
       firstDueDate={data.payments[0]?.dueDate}
       installmentCount={data.payments.length}
       onDone={() => router.back()}

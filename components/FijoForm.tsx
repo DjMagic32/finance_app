@@ -1,3 +1,4 @@
+import DictationInput from '@/components/DictationInput';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { eq } from 'drizzle-orm';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
@@ -9,6 +10,7 @@ import StepForm from '@/components/StepForm';
 import { db, todayISO } from '@/db';
 import { categories, type Recurring } from '@/db/schema';
 import { createRecurring, deleteRecurring, updateRecurring } from '@/services/recurring';
+import DateField from '@/components/DateField';
 import { setupNotifications } from '@/services/notifications';
 
 export default function FijoForm({
@@ -86,7 +88,7 @@ export default function FijoForm({
       saving={saving}
       onDelete={existing ? remove : undefined}>
       {step === 0 && (
-        <TextInput
+        <DictationInput
           label="Nombre (ej: Internet, Luz, Netflix)"
           value={name}
           onChangeText={setName}
@@ -128,17 +130,10 @@ export default function FijoForm({
               { value: 'mensual', label: 'Mensual' },
             ]}
           />
-          <TextInput
-            label="Próximo pago (AAAA-MM-DD)"
-            value={nextDue}
-            onChangeText={setNextDue}
-            placeholder={todayISO()}
-            mode="outlined"
-            error={nextDue.length > 0 && !dateOk}
-          />
+          <DateField label="Próximo pago" value={nextDue} onChange={setNextDue} error={nextDue.length > 0 && !dateOk} />
           {nextDue.length > 0 && !dateOk && (
             <Text style={{ color: 'red', fontSize: 12 }}>
-              Escribe la fecha como 2026-08-15 y que no sea en el pasado.
+              Selecciona una fecha que no sea en el pasado.
             </Text>
           )}
         </View>
